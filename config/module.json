@@ -1,0 +1,7 @@
+{
+  "id": "MFGA",
+  "name": "MFGA-CrDroid",
+  "author": "咿云冷雨(Numbersf), 桉陌",
+  "description": "System font replacement for crDroid 13+.",
+  "minMagisk": "28000"
+}
