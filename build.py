@@ -11,10 +11,39 @@ import zipfile
 import xml.etree.ElementTree as ET
 
 from fontTools.ttLib import TTFont
+from fontTools import subset
+from fontTools.fontBuilder import FontBuilder
+from fontTools.pens.ttGlyphPen import TTGlyphPen
 
 ROOT = Path(__file__).resolve().parent
 OEM_CONFIG = 'system/product/etc/fonts_customization.xml'
-COLORLESS_FONTS = frozenset({'200.ttf', '300.ttf', '400.ttf', '700.ttf'})
+# Preserve the original font-to-weight mapping.
+PRIMARY_WEIGHTS = {
+    100: '200.ttf', 200: '200.ttf', 300: '300.ttf',
+    400: '400.ttf', 500: '400.ttf', 600: '700.ttf',
+    700: '700.ttf', 800: '700.ttf', 900: '700.ttf',
+}
+COLORLESS_FONTS = frozenset(PRIMARY_WEIGHTS.values())
+# Pinned upstream filenames are not their OpenType weights.
+PRIMARY_SOURCE_WEIGHTS = {'200.ttf': 400, '300.ttf': 650, '400.ttf': 700, '700.ttf': 900}
+# Match each installed file's intrinsic style to its intended module slot.
+# Typeface may derive a named family's base weight from this metadata, not XML.
+PRIMARY_STYLE_WEIGHTS = {'200.ttf': 200, '300.ttf': 300, '400.ttf': 400, '700.ttf': 700}
+METRIC_PROFILES = json.loads((ROOT / 'config/metric-fonts.json').read_text())
+PRODUCT_METRIC_FONTS = frozenset(METRIC_PROFILES)
+VARIABLE_FONTS = frozenset({'Roboto-Regular.ttf', 'RobotoFlex-Regular.ttf'}) | PRODUCT_METRIC_FONTS
+OVERFLOW_FONTS = {filename: f'MFGAOverflow-{filename}' for filename in COLORLESS_FONTS}
+# Framework families register static glyphs; legacy XML retains variable providers.
+LEGACY_METRIC_FAMILIES = {
+    'sans-serif': 'Roboto-Regular.ttf', 'sans-serif-condensed': 'Roboto-Regular.ttf',
+    'roboto': 'Roboto-Regular.ttf', 'roboto-flex': 'RobotoFlex-Regular.ttf',
+}
+
+
+def family_signature(family):
+    return [(font.attrib, (font.text or '').strip(),
+             [(axis.attrib) for axis in font.findall('axis')])
+            for font in family.findall('font')]
 
 
 def validate_fonts(root, fonts):
@@ -33,13 +62,54 @@ def validate_fonts(root, fonts):
                 raise ValueError(f'{name}: invalid font filename {filename!r}')
             if not (font_dir / filename).is_file() and filename not in external[name]:
                 raise ValueError(f'{name}: missing module font or unknown system font {filename}')
+            source_name = filename.removeprefix('MFGAOverflow-')
+            if source_name in COLORLESS_FONTS:
+                if not (font_dir / filename).is_file():
+                    raise ValueError(f'{name}: missing primary font {filename}')
+                weight = int(font.get('weight', '400'))
+                if PRIMARY_WEIGHTS.get(weight) != source_name:
+                    raise ValueError(f'{name}: incorrect primary weight {weight}: {filename}')
+                if font.findall('axis') or font.get('supportedAxes'):
+                    raise ValueError(f'{name}: static primary font declares variable axes: {filename}')
+
+    legacy_named = {family.get('name'): family for family in configs['fonts.xml'].findall('family')
+                    if family.get('name')}
 
     fallback = configs['font_fallback.xml']
     named = {family.get('name'): family for family in fallback.findall('family')
              if family.get('name')}
-    for name in ('sans-serif', 'serif', 'monospace', 'roboto', 'roboto-flex'):
+    for name in ('sans-serif', 'sans-serif-condensed', 'serif', 'monospace', 'roboto', 'roboto-flex'):
         if name not in named or not named[name].findall('font'):
             raise ValueError(f'Missing default family: {name}')
+    expected = [(str(weight), filename) for weight, filename in PRIMARY_WEIGHTS.items()]
+    static_signature = [({'weight': weight, 'style': 'normal'}, filename, [])
+                        for weight, filename in expected]
+    for name, family in named.items():
+        legacy = legacy_named.get(name)
+        if name in LEGACY_METRIC_FAMILIES:
+            provider = LEGACY_METRIC_FAMILIES[name]
+            if legacy is None or {(font.text or '').strip() for font in legacy} != {provider}:
+                raise ValueError(f'fonts.xml: missing metric provider for {name}')
+            if family_signature(family) != static_signature:
+                raise ValueError(f'font_fallback.xml: incomplete direct primary registration for {name}')
+        elif legacy is None or family_signature(legacy) != family_signature(family):
+            raise ValueError(f'Inconsistent primary family between font configurations: {name}')
+
+    # Keep the default first and preserve the weighted fallback for other named
+    # families (including Product providers), plus the full tall-symbol coverage.
+    for document_name in ('fonts.xml', 'font_fallback.xml'):
+        document = configs[document_name]
+        first = next(iter(document))
+        if first.tag != 'family' or first.get('name') != 'sans-serif':
+            raise ValueError(f'{document_name}: default sans-serif family must be first')
+        candidates = [family for family in document.findall('family') if not family.attrib]
+        if not any([(font.get('weight'), (font.text or '').strip())
+                    for font in family.findall('font')] == expected for family in candidates):
+            raise ValueError(f'{document_name}: missing weighted primary glyph fallback')
+        overflow_expected = [(weight, OVERFLOW_FONTS[filename]) for weight, filename in expected]
+        if not any([(font.get('weight'), (font.text or '').strip())
+                    for font in family.findall('font')] == overflow_expected for family in candidates):
+            raise ValueError(f'{document_name}: missing tall-symbol glyph fallback')
     names = [family.get('name') for family in configs[OEM_CONFIG]
              if family.tag in ('family', 'family-list')]
     if len(names) != len(set(names)):
@@ -47,6 +117,30 @@ def validate_fonts(root, fonts):
     required = set(json.loads((root / 'config/required-ui-families.json').read_text()))
     if not required.issubset(names):
         raise ValueError(f'Missing system UI families: {sorted(required - set(names))}')
+    for family in configs[OEM_CONFIG]:
+        if family.get('name') in required:
+            refs = {(font.text or '').strip() for font in family.iter('font')}
+            if not refs or not refs.issubset(PRODUCT_METRIC_FONTS):
+                raise ValueError(f'System UI family must retain variable providers: {family.get("name")}')
+
+    # Validate the actual fvar tables, not just whether XML contains axis tags.
+    for document_name, document in configs.items():
+        directory = 'system/product/fonts' if document_name == OEM_CONFIG else 'system/fonts'
+        for filename in VARIABLE_FONTS:
+            references = [font for font in document.iter('font')
+                          if (font.text or '').strip() == filename]
+            if not references:
+                continue
+            with TTFont(fonts / directory / filename, lazy=True) as font_file:
+                axes = {axis.axisTag: axis for axis in font_file['fvar'].axes}
+                for reference in references:
+                    for tag in filter(None, reference.get('supportedAxes', '').split(',')):
+                        if tag not in axes:
+                            raise ValueError(f'{document_name}: {filename} has no {tag} axis')
+                    for axis in reference.findall('axis'):
+                        tag, value = axis.get('tag'), float(axis.get('stylevalue'))
+                        if tag not in axes or not axes[tag].minValue <= value <= axes[tag].maxValue:
+                            raise ValueError(f'{document_name}: invalid {tag} axis for {filename}')
 
     refs = [(font.text or '').strip() for font in fallback.iter('font')]
     for primary in ('200.ttf', '300.ttf', '400.ttf', '700.ttf'):
@@ -60,6 +154,68 @@ def validate_fonts(root, fonts):
             raise ValueError(f'Emoji must precede symbol supplements: {emoji}')
     if refs[-1] != 'ZUno-Number.ttf':
         raise ValueError('Diagnostic glyph placeholders must be last')
+
+
+def validate_conversion(root, fonts):
+    prefix = json.loads((root / 'config/upstream.json').read_text())['font_prefix']
+    style_mask = (1 << 0) | (1 << 5) | (1 << 6) | (1 << 7) | (1 << 9)
+    with zipfile.ZipFile(fonts / 'upstream.zip') as upstream:
+        for filename, weight in PRIMARY_STYLE_WEIGHTS.items():
+            with TTFont(BytesIO(upstream.read(prefix + filename))) as source:
+                cmap = source.getBestCmap()
+                scale = source['head'].unitsPerEm / 2048
+                ascent, descent = round(1900 * scale), round(-500 * scale)
+                top, bottom = round(2163 * scale), round(-555 * scale)
+                ordinary = {cp for cp, name in cmap.items()
+                            if not source['glyf'][name].numberOfContours
+                            or (source['glyf'][name].yMax <= top and source['glyf'][name].yMin >= bottom)}
+                for converted, coverage in ((filename, ordinary), (OVERFLOW_FONTS[filename], set(cmap))):
+                    with TTFont(fonts / 'system/fonts' / converted) as font:
+                        if set(font.getBestCmap()) != coverage:
+                            raise ValueError(f'{converted}: converted glyph coverage changed')
+                        if any(tag in font for tag in ('COLR', 'CPAL', 'fvar')):
+                            raise ValueError(f'{converted}: expected colorless static glyphs')
+                        selection = (1 << 5 if weight >= 700 else 1 << 6) | (1 << 7)
+                        if (font['OS/2'].usWeightClass != weight
+                                or font['OS/2'].version < 4
+                                or (font['OS/2'].fsSelection & style_mask) != selection
+                                or (font['head'].macStyle & 3) != int(weight >= 700)):
+                            raise ValueError(f'{converted}: incorrect converted style')
+                        if font['head'].unitsPerEm != source['head'].unitsPerEm:
+                            raise ValueError(f'{converted}: glyph scale changed during conversion')
+                        expected = (ascent, descent, 0)
+                        if converted != filename:
+                            expected = (max(ascent, font['head'].yMax), min(descent, font['head'].yMin), 0)
+                        if ((font['hhea'].ascent, font['hhea'].descent, font['hhea'].lineGap) != expected
+                                or (font['OS/2'].sTypoAscender, font['OS/2'].sTypoDescender,
+                                    font['OS/2'].sTypoLineGap) != expected):
+                            raise ValueError(f'{converted}: incorrect converted line metrics')
+                        if (font['OS/2'].usWinAscent < max(expected[0], font['head'].yMax)
+                                or font['OS/2'].usWinDescent < max(-expected[1], -font['head'].yMin)):
+                            raise ValueError(f'{converted}: clipping bounds do not cover glyphs')
+                        for cp, name in font.getBestCmap().items():
+                            original = cmap[cp]
+                            if (font['hmtx'][name] != source['hmtx'][original]
+                                    or font['glyf'][name].getCoordinates(font['glyf'])
+                                    != source['glyf'][original].getCoordinates(source['glyf'])):
+                                raise ValueError(f'{converted}: glyph U+{cp:04X} changed during conversion')
+
+    for filename, profile in METRIC_PROFILES.items():
+        with TTFont(fonts / 'system/product/fonts' / filename) as font:
+            fields = {'head': dict(profile['bounds'], unitsPerEm=profile['unitsPerEm'],
+                                   macStyle=profile['macStyle']),
+                      'hhea': profile['hhea'], 'OS/2': profile['os2'], 'post': profile['post']}
+            for table, values in fields.items():
+                for field, expected in values.items():
+                    if getattr(font[table], field) != expected:
+                        raise ValueError(f'{filename}: incorrect converted {table}.{field}')
+            axes = [(axis.axisTag, axis.minValue, axis.defaultValue, axis.maxValue)
+                    for axis in font['fvar'].axes]
+            if axes != [tuple(axis) for axis in profile['axes']]:
+                raise ValueError(f'{filename}: incorrect converted variable axes')
+            if (set(font.getBestCmap()) != {0xFFFF}
+                    or any(font['glyf'][name].numberOfContours for name in font.getGlyphOrder())):
+                raise ValueError(f'{filename}: metric provider contains visible glyphs')
 
 
 def module_files(root, fonts):
@@ -115,20 +271,120 @@ def prepare_upstream_fonts(root, staging):
                 raise ValueError(f'Duplicate upstream font entry: {name}')
             with package.open(entry) as source, target.open('wb') as output:
                 shutil.copyfileobj(source, output)
-    product_font = staging / 'system/product/fonts/Roboto-Regular.ttf'
-    product_font.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(fonts_dir / 'Roboto-Regular.ttf', product_font)
+    # Product XML resolves paths under /product/fonts, not /system/fonts.
+    product_fonts = staging / 'system/product/fonts'
+    product_fonts.mkdir(parents=True, exist_ok=True)
+    for filename, profile in METRIC_PROFILES.items():
+        create_metric_font(profile, filename, product_fonts / filename)
+    for filename in sorted(COLORLESS_FONTS):
+        primary, overflow = split_text_font(prepare_text_font(fonts_dir / filename))
+        (fonts_dir / filename).write_bytes(primary)
+        (fonts_dir / OVERFLOW_FONTS[filename]).write_bytes(overflow)
 
 
-def remove_color_tables(font_path):
-    """Return a copy with COLR/CPAL removed; the source font is never changed."""
+def create_metric_font(profile, filename, output):
+    """Build an empty provider from numeric ROM metrics, without bundling ROM glyphs."""
+    builder = FontBuilder(profile['unitsPerEm'], isTTF=True)
+    glyphs = ['.notdef', 'uniFFFF']
+    builder.setupGlyphOrder(glyphs)
+    builder.setupCharacterMap({0xFFFF: 'uniFFFF'})
+    builder.setupGlyf({name: TTGlyphPen(None).glyph() for name in glyphs})
+    builder.setupHorizontalMetrics({name: (0, 0) for name in glyphs})
+    builder.setupHorizontalHeader(**profile['hhea'])
+    builder.setupOS2(version=4, **profile['os2'])
+    builder.setupNameTable({'familyName': 'MFGA Layout ' + Path(filename).stem,
+                            'styleName': 'Italic' if profile['macStyle'] & 2 else 'Regular',
+                            'psName': 'MFGALayout-' + Path(filename).stem})
+    builder.setupPost(**profile['post'])
+    builder.setupFvar([(*axis, axis[0]) for axis in profile['axes']], [])
+    builder.setupGvar({name: [] for name in glyphs})
+    # Empty glyphs have no outlines to recompute. Keep the source's layout box.
+    builder.font.recalcBBoxes = False
+    for field, value in profile['bounds'].items():
+        setattr(builder.font['head'], field, value)
+    builder.font['head'].macStyle = profile['macStyle']
+    builder.save(output)
+
+
+def prepare_text_font(font_path):
+    """Preserve glyphs while correcting intrinsic styles and Roboto line metrics."""
     with TTFont(font_path) as font:
+        expected_weight = PRIMARY_SOURCE_WEIGHTS[font_path.name]
+        if font['OS/2'].usWeightClass != expected_weight:
+            raise ValueError(f'{font_path.name}: upstream weight changed; review primary mappings')
         for table in ('COLR', 'CPAL'):
             if table in font:
                 del font[table]
+        # XML controls matching, but Typeface::createFromFamilies also reads
+        # SkTypeface's intrinsic style to initialize the family's base weight.
+        # In particular, the source 400.ttf is internally 700/Bold. Leaving it
+        # unchanged makes NORMAL inherit 700 and select the heavier 700.ttf.
+        style_weight = PRIMARY_STYLE_WEIGHTS[font_path.name]
+        bold = style_weight >= 700
+        font['OS/2'].usWeightClass = style_weight
+        font['OS/2'].fsSelection = ((font['OS/2'].fsSelection & ~((1 << 5) | (1 << 6)))
+                                   | (1 << 5 if bold else 1 << 6))
+        font['head'].macStyle = (font['head'].macStyle & ~1) | int(bold)
+        # NEW/system/fonts/Roboto-Regular.ttf: 1900/-500/0 at 2048 UPEM.
+        # Match hhea and typo consumers without shifting or scaling glyph outlines.
+        scale = font['head'].unitsPerEm / 2048
+        ascent, descent = round(1900 * scale), round(-500 * scale)
+        font['hhea'].ascent, font['hhea'].descent = ascent, descent
+        font['hhea'].lineGap = 0
+        font['OS/2'].sTypoAscender, font['OS/2'].sTypoDescender = ascent, descent
+        font['OS/2'].sTypoLineGap = 0
+        font['OS/2'].version = max(4, font['OS/2'].version)
+        font['OS/2'].fsSelection |= 1 << 7  # USE_TYPO_METRICS: consistent line spacing.
+        # Keep usWinAscent/usWinDescent and glyph bounds for clipping safety.
         output = BytesIO()
         font.save(output)
     return output.getvalue()
+
+
+def split_text_font(data):
+    """Keep tall symbols available without inflating every ordinary text box."""
+    with TTFont(BytesIO(data)) as font:
+        cmap = font.getBestCmap()
+        scale = font['head'].unitsPerEm / 2048
+        top, bottom = round(2163 * scale), round(-555 * scale)
+        tall = set()
+        for codepoint, name in cmap.items():
+            glyph = font['glyf'][name]
+            if glyph.numberOfContours and (glyph.yMax > top or glyph.yMin < bottom):
+                tall.add(codepoint)
+        # Full coverage in overflow also preserves combining-mark clusters with
+        # arbitrary bases. Its larger metrics apply only when it is selected.
+        for record in font['name'].names:
+            if record.nameID in (1, 3, 4, 6, 16):
+                value = record.toUnicode() + ('-Overflow' if record.nameID == 6 else ' Overflow')
+                record.string = value.encode(record.getEncoding())
+        ascent = max(font['hhea'].ascent, font['head'].yMax)
+        descent = min(font['hhea'].descent, font['head'].yMin)
+        font['hhea'].ascent, font['hhea'].descent = ascent, descent
+        font['OS/2'].sTypoAscender, font['OS/2'].sTypoDescender = ascent, descent
+        font['OS/2'].usWinAscent, font['OS/2'].usWinDescent = ascent, -descent
+        overflow = BytesIO()
+        font.save(overflow)
+    with TTFont(BytesIO(data)) as font:
+        options = subset.Options()
+        options.layout_features = ['*']
+        options.name_IDs = ['*']
+        options.name_legacy = True
+        options.name_languages = ['*']
+        options.recalc_bounds = True
+        subsetter = subset.Subsetter(options=options)
+        subsetter.populate(unicodes=set(font.getBestCmap()) - tall)
+        subsetter.subset(font)
+        # Preserve true bounds, including any unencoded layout alternates kept
+        # by GSUB closure. Prefer typo metrics for line spacing, not these bounds.
+        glyphs = [font['glyf'][name] for name in font.getGlyphOrder()]
+        font['OS/2'].usWinAscent = max(font['hhea'].ascent,
+                                      max((getattr(g, 'yMax', 0) for g in glyphs), default=0))
+        font['OS/2'].usWinDescent = max(-font['hhea'].descent,
+                                       -min((getattr(g, 'yMin', 0) for g in glyphs), default=0))
+        primary = BytesIO()
+        font.save(primary)
+    return primary.getvalue(), overflow.getvalue()
 
 
 def module_properties(root):
@@ -156,10 +412,7 @@ def write_package(files, properties, output):
         with zipfile.ZipFile(temporary, 'w', compression=zipfile.ZIP_DEFLATED) as package:
             package.writestr('module.prop', properties)
             for name, path in sorted(files.items()):
-                if name.startswith('system/fonts/') and Path(name).name in COLORLESS_FONTS:
-                    package.writestr(name, remove_color_tables(path))
-                else:
-                    package.write(path, name)
+                package.write(path, name)
         with zipfile.ZipFile(temporary) as package:
             bad_entry = package.testzip()
             if bad_entry:
@@ -176,6 +429,7 @@ def build_module(root=ROOT, output=None):
         fonts = Path(temporary)
         prepare_upstream_fonts(root, fonts)
         validate_fonts(root, fonts)
+        validate_conversion(root, fonts)
         return write_package(module_files(root, fonts), properties,
                              output or root / 'dist/MFGA-CrDroid.zip')
 

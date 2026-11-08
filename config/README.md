@@ -16,8 +16,25 @@ optional references retained in the upstream legacy `fonts.xml`. It is not a
 list of fonts bundled in this module. When changing these references, review
 the target ROM's font configuration before updating this list.
 
-`required-ui-families.json` records the Google Sans and variable family names
-retained after removing OEM registrations caused SystemUI to fail on the device.
-The build rejects missing registrations. This does not guarantee that every
-configuration will work on other ROM versions; boot and rendering still need
-device verification.
+`metric-fonts.json` supplies numeric metrics and axes for generated, empty Product
+fonts. Google Sans Flex uses the pinned upstream SysFont profile; the other
+profiles come from the local ROM reference dump. `NEW/` is excluded from Git and
+is not a build input.
+
+Primary fonts preserve the original XML weight mapping. The build verifies their
+source weights, normalizes installed metadata to 200/300/400/700, and aligns
+Roboto line metrics. The default `400.ttf` must be internally 400/Regular because
+Android can derive a named family's base weight from intrinsic font metadata.
+Tall glyphs remain in complete `MFGAOverflow-*` fallback copies; ordinary fonts
+recompute their bounds without changing outlines or advances.
+
+Framework XML registers static styles directly, while legacy XML and Product
+families retain variable metric providers. The build checks static mappings,
+fallback coverage, and variable axes against the actual font files.
+
+`required-ui-families.json` lists required Google Sans and variable SystemUI
+families. The build rejects missing registrations.
+
+`python3 build.py` downloads the pinned upstream archive, verifies its SHA256,
+adapts the real fonts, and validates the converted metrics, styles, glyphs,
+coverage, and XML references before packaging. Any failure stops the Actions build.

@@ -1,0 +1,369 @@
+{
+  "GoogleSans-Italic.ttf": {
+    "source": "NEW/system/product/fonts/GoogleSans-Italic.ttf",
+    "unitsPerEm": 1000,
+    "bounds": {
+      "xMin": -216,
+      "yMin": -381,
+      "xMax": 3284,
+      "yMax": 1056
+    },
+    "hhea": {
+      "ascent": 966,
+      "descent": -286,
+      "lineGap": 0,
+      "advanceWidthMax": 3284,
+      "minLeftSideBearing": -216,
+      "minRightSideBearing": -492,
+      "xMaxExtent": 3284,
+      "caretSlopeRise": 1000,
+      "caretSlopeRun": 176,
+      "caretOffset": 0
+    },
+    "os2": {
+      "sTypoAscender": 966,
+      "sTypoDescender": -286,
+      "sTypoLineGap": 0,
+      "usWinAscent": 1057,
+      "usWinDescent": 382,
+      "fsSelection": 129,
+      "usWeightClass": 400,
+      "usWidthClass": 5,
+      "xAvgCharWidth": 608,
+      "sxHeight": 510,
+      "sCapHeight": 716,
+      "yStrikeoutSize": 84,
+      "yStrikeoutPosition": 306,
+      "ySubscriptXSize": 650,
+      "ySubscriptYSize": 600,
+      "ySubscriptXOffset": -13,
+      "ySubscriptYOffset": 75,
+      "ySuperscriptXSize": 650,
+      "ySuperscriptYSize": 600,
+      "ySuperscriptXOffset": 62,
+      "ySuperscriptYOffset": 350
+    },
+    "macStyle": 2,
+    "axes": [
+      [
+        "opsz",
+        17.0,
+        18.0,
+        18.0
+      ],
+      [
+        "wght",
+        400.0,
+        400.0,
+        700.0
+      ],
+      [
+        "GRAD",
+        -50.0,
+        0.0,
+        200.0
+      ]
+    ],
+    "post": {
+      "italicAngle": -10.0,
+      "underlinePosition": -160,
+      "underlineThickness": 84
+    }
+  },
+  "GoogleSans-Regular.ttf": {
+    "source": "NEW/system/product/fonts/GoogleSans-Regular.ttf",
+    "unitsPerEm": 1000,
+    "bounds": {
+      "xMin": -173,
+      "yMin": -381,
+      "xMax": 3284,
+      "yMax": 1056
+    },
+    "hhea": {
+      "ascent": 966,
+      "descent": -286,
+      "lineGap": 0,
+      "advanceWidthMax": 3284,
+      "minLeftSideBearing": -173,
+      "minRightSideBearing": -527,
+      "xMaxExtent": 3284,
+      "caretSlopeRise": 1,
+      "caretSlopeRun": 0,
+      "caretOffset": 0
+    },
+    "os2": {
+      "sTypoAscender": 966,
+      "sTypoDescender": -286,
+      "sTypoLineGap": 0,
+      "usWinAscent": 1057,
+      "usWinDescent": 382,
+      "fsSelection": 192,
+      "usWeightClass": 400,
+      "usWidthClass": 5,
+      "xAvgCharWidth": 607,
+      "sxHeight": 510,
+      "sCapHeight": 716,
+      "yStrikeoutSize": 84,
+      "yStrikeoutPosition": 306,
+      "ySubscriptXSize": 650,
+      "ySubscriptYSize": 600,
+      "ySubscriptXOffset": 0,
+      "ySubscriptYOffset": 75,
+      "ySuperscriptXSize": 650,
+      "ySuperscriptYSize": 600,
+      "ySuperscriptXOffset": 0,
+      "ySuperscriptYOffset": 350
+    },
+    "macStyle": 0,
+    "axes": [
+      [
+        "opsz",
+        17.0,
+        18.0,
+        18.0
+      ],
+      [
+        "wght",
+        400.0,
+        400.0,
+        700.0
+      ],
+      [
+        "GRAD",
+        -50.0,
+        0.0,
+        200.0
+      ]
+    ],
+    "post": {
+      "italicAngle": 0.0,
+      "underlinePosition": -160,
+      "underlineThickness": 84
+    }
+  },
+  "GoogleSansClock-Regular.ttf": {
+    "source": "NEW/system/product/fonts/GoogleSansClock-Regular.ttf",
+    "unitsPerEm": 1000,
+    "bounds": {
+      "xMin": -2,
+      "yMin": -361,
+      "xMax": 1144,
+      "yMax": 827
+    },
+    "hhea": {
+      "ascent": 960,
+      "descent": -253,
+      "lineGap": 0,
+      "advanceWidthMax": 1144,
+      "minLeftSideBearing": -2,
+      "minRightSideBearing": -60,
+      "xMaxExtent": 1144,
+      "caretSlopeRise": 1,
+      "caretSlopeRun": 0,
+      "caretOffset": 0
+    },
+    "os2": {
+      "sTypoAscender": 960,
+      "sTypoDescender": -253,
+      "sTypoLineGap": 0,
+      "usWinAscent": 966,
+      "usWinDescent": 362,
+      "fsSelection": 192,
+      "usWeightClass": 400,
+      "usWidthClass": 5,
+      "xAvgCharWidth": 571,
+      "sxHeight": 490,
+      "sCapHeight": 716,
+      "yStrikeoutSize": 84,
+      "yStrikeoutPosition": 294,
+      "ySubscriptXSize": 650,
+      "ySubscriptYSize": 600,
+      "ySubscriptXOffset": 0,
+      "ySubscriptYOffset": 75,
+      "ySuperscriptXSize": 650,
+      "ySuperscriptYSize": 600,
+      "ySuperscriptXOffset": 0,
+      "ySuperscriptYOffset": 350
+    },
+    "macStyle": 0,
+    "axes": [
+      [
+        "wght",
+        0.0,
+        400.0,
+        700.0
+      ],
+      [
+        "SWNG",
+        -50.0,
+        0.0,
+        50.0
+      ]
+    ],
+    "post": {
+      "italicAngle": 0.0,
+      "underlinePosition": -412,
+      "underlineThickness": 84
+    }
+  },
+  "GoogleSansFlexClock-Regular.ttf": {
+    "source": "NEW/system/product/fonts/GoogleSansFlexClock-Regular.ttf",
+    "unitsPerEm": 2000,
+    "bounds": {
+      "xMin": -25,
+      "yMin": -110,
+      "xMax": 1267,
+      "yMax": 1453
+    },
+    "hhea": {
+      "ascent": 1932,
+      "descent": -572,
+      "lineGap": 0,
+      "advanceWidthMax": 1295,
+      "minLeftSideBearing": -25,
+      "minRightSideBearing": -95,
+      "xMaxExtent": 1267,
+      "caretSlopeRise": 2000,
+      "caretSlopeRun": 0,
+      "caretOffset": 0
+    },
+    "os2": {
+      "sTypoAscender": 1932,
+      "sTypoDescender": -572,
+      "sTypoLineGap": 0,
+      "usWinAscent": 1547,
+      "usWinDescent": 321,
+      "fsSelection": 192,
+      "usWeightClass": 400,
+      "usWidthClass": 5,
+      "xAvgCharWidth": 1174,
+      "sxHeight": 1050,
+      "sCapHeight": 1432,
+      "yStrikeoutSize": 168,
+      "yStrikeoutPosition": 612,
+      "ySubscriptXSize": 1109,
+      "ySubscriptYSize": 1109,
+      "ySubscriptXOffset": 0,
+      "ySubscriptYOffset": 344,
+      "ySuperscriptXSize": 1109,
+      "ySuperscriptYSize": 1109,
+      "ySuperscriptXOffset": 0,
+      "ySuperscriptYOffset": 954
+    },
+    "macStyle": 0,
+    "axes": [
+      [
+        "wdth",
+        25.0,
+        100.0,
+        151.0
+      ],
+      [
+        "wght",
+        0.0,
+        400.0,
+        1000.0
+      ],
+      [
+        "ROND",
+        0.0,
+        0.0,
+        100.0
+      ],
+      [
+        "slnt",
+        -10.0,
+        0.0,
+        0.0
+      ]
+    ],
+    "post": {
+      "italicAngle": 0.0,
+      "underlinePosition": -320,
+      "underlineThickness": 168
+    }
+  },
+  "GoogleSansFlex-Regular.ttf": {
+    "source": "pinned upstream: system/fonts/SysFont-Regular.ttf",
+    "unitsPerEm": 2000,
+    "bounds": {
+      "xMin": -392,
+      "yMin": -573,
+      "xMax": 6568,
+      "yMax": 2208
+    },
+    "hhea": {
+      "ascent": 1932,
+      "descent": -572,
+      "lineGap": 0,
+      "advanceWidthMax": 6568,
+      "minLeftSideBearing": -392,
+      "minRightSideBearing": -429,
+      "xMaxExtent": 6568,
+      "caretSlopeRise": 2000,
+      "caretSlopeRun": 0,
+      "caretOffset": 0
+    },
+    "os2": {
+      "sTypoAscender": 1932,
+      "sTypoDescender": -572,
+      "sTypoLineGap": 0,
+      "usWinAscent": 2452,
+      "usWinDescent": 999,
+      "fsSelection": 64,
+      "usWeightClass": 400,
+      "usWidthClass": 5,
+      "xAvgCharWidth": 1118,
+      "sxHeight": 1020,
+      "sCapHeight": 1432,
+      "yStrikeoutSize": 168,
+      "yStrikeoutPosition": 612,
+      "ySubscriptXSize": 1200,
+      "ySubscriptYSize": 1200,
+      "ySubscriptXOffset": 0,
+      "ySubscriptYOffset": 409,
+      "ySuperscriptXSize": 1200,
+      "ySuperscriptYSize": 1200,
+      "ySuperscriptXOffset": 0,
+      "ySuperscriptYOffset": 954
+    },
+    "macStyle": 0,
+    "axes": [
+      [
+        "opsz",
+        6.0,
+        18.0,
+        144.0
+      ],
+      [
+        "wdth",
+        25.0,
+        100.0,
+        151.0
+      ],
+      [
+        "wght",
+        1.0,
+        400.0,
+        1000.0
+      ],
+      [
+        "GRAD",
+        0.0,
+        0.0,
+        100.0
+      ],
+      [
+        "slnt",
+        -10.0,
+        0.0,
+        0.0
+      ]
+    ],
+    "post": {
+      "italicAngle": 0.0,
+      "underlinePosition": -320,
+      "underlineThickness": 168
+    }
+  }
+}
